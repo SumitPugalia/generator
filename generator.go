@@ -53,6 +53,9 @@ func main() {
 	createFile(Service+"/repository", LowerCaseModel+".go", repoInterfaceData())
 	createFile(repositoryDir, "connection.go", connectionData())
 	createFile(repositoryDir, LowerCaseModel+".go", repoImplementationData())
+
+	//main.go
+	createFile(Service, "main.go", mainData())
 }
 
 func createDir(dirName string) error {
@@ -289,19 +292,6 @@ func endpointData() []byte {
 	return []byte(data)
 }
 
-func make_service() string {
-	data := "func MakeService() service.Service {\n" +
-		"\trDB, err := db.GetPostgresDB()\n" +
-		"\tif err != nil {\n\t\tfmt.Println(\"Error getting Read DB\")\n\t}\n" +
-		"\twDB, err := db.GetPostgresDB()\n" +
-		"\tif err != nil {\n\t\tfmt.Println(\"Error getting Write DB\")\n\t}\n" +
-		"\tbr := repos2.Make" + Model + "Repo(wDB, rDB)\n" +
-		"\tmr := repos2.MakeModelRepo(wDB, rDB)\n" +
-		"\treturn coreService{br, mr}\n" + "}\n"
-
-	return data
-}
-
 func serviceImplementationFunctions() string {
 	data :=
 		"func (s ServiceImpl) List" + Model + "s() ([]entity." + Model + ", error) {\n" +
@@ -389,7 +379,75 @@ func repoImplementationData() []byte {
 }
 
 func connectionData() []byte {
-	return []byte("Yet To BE ImpleMEnted")
+	data := `
+package postgresql
+
+import (
+	"upper.io/db.v3/lib/sqlbuilder"
+	"upper.io/db.v3/postgresql"
+)
+
+func openConn() sqlbuilder.Database {
+	connSettings := postgresql.ConnectionURL{
+		User:     "",
+		Password: "",
+		Host:     "",
+		Socket:   "",
+		Database: "",
+		Options:  nil,
+	}
+
+	conn, err := postgresql.Open(connSettings)
+
+	if err != nil {
+		panic("SHIT NO DB")
+	}
+
+	return conn
+}
+
+func getReadConn() sqlbuilder.Database {
+	return openConn();
+}
+
+func getWriteConn() sqlbuilder.Database {
+	return openConn();
+}
+	`
+	return []byte(data)
+}
+
+func mainData() []byte {
+	data := "package main\n\n" +
+		"import (\n" +
+		"\t\"" + Service + "/service\"\n" +
+		"\t\"" + Service + "/endpoint\"\n" +
+		"\thttpTransport \"github.com/go-kit/kit/transport/http\"\n" +
+		"\t\"github.com/gorilla/mux\"\n" +
+		"\t\"log\"\n" +
+		"\t\"net/http\"\n" +
+		")\n\n"
+
+	main := `func main() {
+	router := mux.NewRouter()
+	assignRoutes(router)
+	http.Handle("/", router)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+`
+	remain :=
+		"\nfunc assignRoutes(router *mux.Router) *mux.Router {\n" +
+			"\tservice := service.MakeServiceImpl()\n" +
+
+			"\n\tlist" + Model + "sHandler := httpTransport.NewServer(\n" +
+			"\tendpoint.MakeList" + Model + "sEndpoint(service),\n" +
+			"\tendpoint.MakeDecoder(endpoint.List" + Model + "sRequest{}),\n" +
+			"\tendpoint.EncodeResponse)\n" +
+
+			"\n\trouter.Handle(\"/" + LowerCaseModel + "s\", list" + Model + "sHandler).Methods(\"GET\")\n" +
+			"\treturn router\n}\n"
+
+	return []byte(data + main + remain)
 }
 
 func LowerInitial(str string) string {
