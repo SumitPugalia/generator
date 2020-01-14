@@ -21,7 +21,7 @@ var Attributes map[string]string
 func main() {
 	filename := os.Args[1]
 	readFile(filename)
-	LowerCaseModel = strings.ToLower(Model)
+	LowerCaseModel = LowerInitial(Model)
 	r := strings.Split(Service, "-")
 	for _, value := range r {
 		ServiceAbbreviation += string(value[0])
@@ -31,7 +31,7 @@ func main() {
 	// Domain Structure
 	domainDir := Service + "/" + "domain/entity"
 	createDir(domainDir)
-	createFile(domainDir, LowerCaseModel+".go", entityModelData())
+	createFile(domainDir, ToSnakeCase(Model)+".go", entityModelData())
 	createFile(Service+"/"+"domain", "service.go", serviceInterfaceData())
 
 	// Service structure
@@ -50,9 +50,9 @@ func main() {
 	// Repository structure
 	repositoryDir := Service + "/repository/impl/postgresql"
 	createDir(repositoryDir)
-	createFile(Service+"/repository", LowerCaseModel+".go", repoInterfaceData())
+	createFile(Service+"/repository", ToSnakeCase(Model)+".go", repoInterfaceData())
 	createFile(repositoryDir, "connection.go", connectionData())
-	createFile(repositoryDir, LowerCaseModel+".go", repoImplementationData())
+	createFile(repositoryDir, ToSnakeCase(Model)+".go", repoImplementationData())
 
 	//main.go
 	createFile(Service, "main.go", mainData())
@@ -475,4 +475,13 @@ func errorNotNilString() string {
 
 func funcString(name string) string {
 	return "func " + name + "(s domain.Service) endpoint.Endpoint {\n"
+}
+
+var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+
+func ToSnakeCase(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
 }
