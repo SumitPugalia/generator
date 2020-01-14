@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 var Service string
@@ -34,16 +35,14 @@ func main() {
 	create_file(Service+"/"+"domain", "service.go", service_interface_data())
 
 	// Service structure
-	service_dir := Service + "/" + "service/"
+	service_dir := Service + "/" + "service"
 	create_dir(service_dir)
 	create_file(service_dir, "service.go", service_implementation())
-	// // Create Core -> repos Structure
-	// core := Service + "/" + "core"
-	// create_dir(core)
-	// create_dir(core + "/" + "repos")
-	// create_file(core+"/"+"repos", LowerCaseModel+".go", repos_models_data())
-	// create_file(core, "core.go", service_implementation())
 
+	// Endpoint structure
+	endpoint_dir := Service + "/" + "endpoint"
+	create_dir(endpoint_dir)
+	create_file(endpoint_dir, "decoder.go", decoder_data())
 }
 
 func create_dir(dirName string) error {
@@ -183,6 +182,34 @@ func service_functions(prefix string) string {
 	return list + get + create + update + del
 }
 
+func decoder_data() []byte {
+	b := new(bytes.Buffer)
+	for key, value := range Attributes {
+		fmt.Fprintf(b, "\t%s %s %s\n", key, value, "`json:\""+LowerInitial(key)+"\"`")
+	}
+
+	data :=
+		"package endpoint \n\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\t\"encoding/json\"\n" +
+			"\t\"net/http\"\n" +
+			")\n\n" +
+			"type List" + Model + "sRequest struct{}\n\n" +
+			"type Get" + Model + "Request struct {\n\tId string `json:\"id\"`\n}\n\n" +
+			"type Delete" + Model + "Request struct {\n\tId string `json:\"id\"`\n}\n\n" +
+			"//Remove the attribute that is not required for create or update as part of request\n" +
+			"type Create" + Model + "Request struct {\n" +
+			b.String() +
+			"}\n\n" +
+			"type Update" + Model + "Request struct {\n" +
+			b.String() +
+			"}\n\n" +
+			make_decoder()
+
+	return []byte(data)
+}
+
 func make_service() string {
 	data := "func MakeService() service.Service {\n" +
 		"\trDB, err := db.GetPostgresDB()\n" +
@@ -218,4 +245,23 @@ func service_implementation_functions() string {
 			"\treturn s." + LowerCaseModel + "Repo.Delete" + Model + "(id)\n" +
 			"}\n\n"
 	return data
+}
+
+func make_decoder() string {
+	return "func MakeDecoder(request interface{}) func (_ context.Context, r *http.Request) (interface{}, error) {\n" +
+		"\treturn func (_ context.Context, r *http.Request) (interface{}, error) {\n" +
+		"\t\tif err := json.NewDecoder(r.Body).Decode(&request); err != nil {\n" +
+		"\t\t\treturn nil, err\n" +
+		"\t\t}\n" +
+		"\treturn request, nil\n" +
+		"\t}\n" +
+		"}"
+}
+
+func LowerInitial(str string) string {
+	for i, v := range str {
+		temp := string(unicode.ToLower(v)) + str[i+1:]
+		return strings.Trim(temp, " ")
+	}
+	return ""
 }
