@@ -27,18 +27,22 @@ func main() {
 	}
 	fmt.Println(ServiceAbbreviation)
 
-	// Create Service Structure
-	dir := Service + "/" + "domain/" + "entity"
-	create_dir(dir)
-	create_file(dir, LowerCaseModel+".go", entity_model_data())
+	// Domain Structure
+	domain_dir := Service + "/" + "domain/" + "entity"
+	create_dir(domain_dir)
+	create_file(domain_dir, LowerCaseModel+".go", entity_model_data())
 	create_file(Service+"/"+"domain", "service.go", service_interface_data())
 
+	// Service structure
+	service_dir := Service + "/" + "service/"
+	create_dir(service_dir)
+	create_file(service_dir, "service.go", service_implementation())
 	// // Create Core -> repos Structure
 	// core := Service + "/" + "core"
 	// create_dir(core)
 	// create_dir(core + "/" + "repos")
 	// create_file(core+"/"+"repos", LowerCaseModel+".go", repos_models_data())
-	// create_file(core, "core.go", core_core_data())
+	// create_file(core, "core.go", service_implementation())
 
 }
 
@@ -148,22 +152,23 @@ func repos_models_data() []byte {
 	return []byte(data)
 }
 
-func core_core_data() []byte {
-	data := "// FIXME: Figure out better naming convention for the package (service implementation) \n" +
-		"// Contains implementation of \"Service\" interface \n" +
-		"package core \n\n" +
-		"import (\n" +
-		"\t\"fmt\"\n" +
-		"\t\"" + Service + "/core/db\"\n" +
-		"\trepos2 \"" + Service + "/core/db/repos\"\n" +
-		"\t\"" + Service + "/core/repos\"\n" +
-		"\t\"" + Service + "/service\"\n" +
-		")\n\n" +
-		"type coreService struct {\n" +
-		"\t" + LowerCaseModel + "Repo" + " " + "repos." + Model + "Repo\n" +
-		"}\n\n" +
-		make_service() + "\n" +
-		make_core_functions_data()
+func service_implementation() []byte {
+	data :=
+		"package service \n\n" +
+			"import (\n" +
+			"\t\"" + Service + "/domain\"\n" +
+			"\t\"" + Service + "/domain/entity\"\n" +
+			"\t\"" + Service + "/repository\"\n" +
+			"\t\"" + Service + "/repository/impl/postgresql\"\n" +
+			")\n\n" +
+			"type ServiceImpl struct {\n" +
+			"\t" + LowerCaseModel + "Repo" + " " + "repository" + Model + "Repo\n" +
+			"}\n\n" +
+			"func MakeServiceImpl() ServiceImpl {\n" +
+			"\t" + LowerCaseModel + "Repo := postgresql.MakePostgres" + Model + "Repo()\n" +
+			"\treturn ServiceImpl{" + LowerCaseModel + "Repo: &" + LowerCaseModel + "Repo}\n" +
+			"}\n\n" +
+			service_implementation_functions()
 
 	return []byte(data)
 }
@@ -191,25 +196,25 @@ func make_service() string {
 	return data
 }
 
-func make_core_functions_data() string {
+func service_implementation_functions() string {
 	data :=
-		"func (s coreService) List" + Model + "s() ([]service." + Model + ", error) {\n" +
+		"func (s ServiceImpl) List" + Model + "s() ([]entity." + Model + ", error) {\n" +
 			"\treturn s." + LowerCaseModel + "Repo.List" + Model + "s()\n" +
 			"}\n\n" +
 
-			"func (s coreService) Get" + Model + "(id int64) (service." + Model + ", error) {\n" +
+			"func (s ServiceImpl) Get" + Model + "(id string) (entity." + Model + ", error) {\n" +
 			"\treturn s." + LowerCaseModel + "Repo.Get" + Model + "(id)\n" +
 			"}\n\n" +
 
-			"func (s coreService) Create" + Model + "(" + LowerCaseModel + " service." + Model + ") (service." + Model + ", error) {\n" +
+			"func (s ServiceImpl) Create" + Model + "(params domain.Create" + Model + "Params) (entity." + Model + ", error) {\n" +
 			"\treturn s." + LowerCaseModel + "Repo.Create" + Model + "(" + LowerCaseModel + ")\n" +
 			"}\n\n" +
 
-			"func (s coreService) Update" + Model + "(" + LowerCaseModel + " service." + Model + ") (service." + Model + ", error) {\n" +
+			"func (s ServiceImpl) Update" + Model + "(params domain.Update" + Model + "Params) (entity." + Model + ", error) {\n" +
 			"\treturn s." + LowerCaseModel + "Repo.Update" + Model + "(" + LowerCaseModel + ")\n" +
 			"}\n\n" +
 
-			"func (s coreService) Delete" + Model + "(id int64) (interface{}, error) {\n" +
+			"func (s ServiceImpl) Delete" + Model + "(id string) error {\n" +
 			"\treturn s." + LowerCaseModel + "Repo.Delete" + Model + "(id)\n" +
 			"}\n\n"
 	return data
