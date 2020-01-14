@@ -44,6 +44,7 @@ func main() {
 	create_dir(endpoint_dir)
 	create_file(endpoint_dir, "decoder.go", decoder_data())
 	create_file(endpoint_dir, "encoder.go", encoder_data())
+	create_file(endpoint_dir, "view.go", view_data())
 }
 
 func create_dir(dirName string) error {
@@ -225,6 +226,30 @@ func encoder_data() []byte {
 		"func EncodeResponse(_ context.Context, w http.ResponseWriter, response interface{}) error {\n" +
 		"\treturn json.NewEncoder(w).Encode(response)\n" +
 		"}"
+
+	return []byte(data)
+}
+
+func view_data() []byte {
+	b := new(bytes.Buffer)
+	v := new(bytes.Buffer)
+	for key, value := range Attributes {
+		fmt.Fprintf(b, "\t%s %s %s\n", key, value, "`json:\""+LowerInitial(key)+"\"`")
+		fmt.Fprintf(v, "\t\t%s: %s\n", key, LowerCaseModel+"."+key+",")
+	}
+
+	data := "package endpoint\n\n" +
+		"import (\n" +
+		"\t\"" + Service + "/domain/entity\"\n" +
+		")\n\n" +
+		"type " + Model + "View struct {\n" +
+		b.String() +
+		"}\n\n" +
+
+		"func to" + Model + "View(" + LowerCaseModel + "entity." + Model + ") " + Model + "View {\n" +
+		"\treturn " + Model + "View{\n" +
+		v.String() +
+		"\t}\n}"
 
 	return []byte(data)
 }
