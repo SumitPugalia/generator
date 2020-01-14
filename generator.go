@@ -20,7 +20,7 @@ var Attributes map[string]string
 
 func main() {
 	filename := os.Args[1]
-	read_file(filename)
+	readFile(filename)
 	LowerCaseModel = strings.ToLower(Model)
 	r := strings.Split(Service, "-")
 	for _, value := range r {
@@ -29,26 +29,33 @@ func main() {
 	fmt.Println(ServiceAbbreviation)
 
 	// Domain Structure
-	domain_dir := Service + "/" + "domain/" + "entity"
-	create_dir(domain_dir)
-	create_file(domain_dir, LowerCaseModel+".go", entity_model_data())
-	create_file(Service+"/"+"domain", "service.go", service_interface_data())
+	domainDir := Service + "/" + "domain/entity"
+	createDir(domainDir)
+	createFile(domainDir, LowerCaseModel+".go", entityModelData())
+	createFile(Service+"/"+"domain", "service.go", serviceInterfaceData())
 
 	// Service structure
-	service_dir := Service + "/" + "service"
-	create_dir(service_dir)
-	create_file(service_dir, "service.go", service_implementation())
+	serviceDir := Service + "/service"
+	createDir(serviceDir)
+	createFile(serviceDir, "service.go", serviceImplementation())
 
 	// Endpoint structure
-	endpoint_dir := Service + "/" + "endpoint"
-	create_dir(endpoint_dir)
-	create_file(endpoint_dir, "decoder.go", decoder_data())
-	create_file(endpoint_dir, "encoder.go", encoder_data())
-	create_file(endpoint_dir, "view.go", view_data())
-	create_file(endpoint_dir, "endpoint.go", endpoint_data())
+	endpointDir := Service + "/endpoint"
+	createDir(endpointDir)
+	createFile(endpointDir, "decoder.go", decoderData())
+	createFile(endpointDir, "encoder.go", encoderData())
+	createFile(endpointDir, "view.go", viewData())
+	createFile(endpointDir, "endpoint.go", endpointData())
+
+	// Repository structure
+	repositoryDir := Service + "/repository/impl/postgresql"
+	createDir(repositoryDir)
+	createFile(Service+"/repository", LowerCaseModel+".go", repoInterfaceData())
+	createFile(repositoryDir, "connection.go", connectionData())
+	createFile(repositoryDir, LowerCaseModel+".go", repoImplementationData())
 }
 
-func create_dir(dirName string) error {
+func createDir(dirName string) error {
 	err := os.MkdirAll(dirName, 0777)
 	if err == nil || os.IsExist(err) {
 		return nil
@@ -58,7 +65,7 @@ func create_dir(dirName string) error {
 	}
 }
 
-func create_file(dirPath string, name string, data []byte) {
+func createFile(dirPath string, name string, data []byte) {
 	dst, err := os.Create(filepath.Join(dirPath, filepath.Base(name)))
 	if err != nil {
 		log.Fatal(err)
@@ -72,7 +79,7 @@ func create_file(dirPath string, name string, data []byte) {
 	}
 }
 
-func read_file(name string) {
+func readFile(name string) {
 	file, err := os.Open(name)
 	if err != nil {
 		log.Fatal(err)
@@ -114,7 +121,7 @@ func read_file(name string) {
 	}
 }
 
-func entity_model_data() []byte {
+func entityModelData() []byte {
 	b := new(bytes.Buffer)
 	for key, value := range Attributes {
 		fmt.Fprintf(b, "\t%s %s\n", key, value)
@@ -124,19 +131,17 @@ func entity_model_data() []byte {
 	return []byte(data)
 }
 
-func service_interface_data() []byte {
+func serviceInterfaceData() []byte {
 	b := new(bytes.Buffer)
 	for key, value := range Attributes {
-		if key != "Id" {
-			fmt.Fprintf(b, "\t%s %s\n", key, value)
-		}
+		fmt.Fprintf(b, "\t%s %s\n", key, value)
 	}
 
 	data :=
 		"package domain\n\n" +
-			"import \"" + Service + "/entity\"\n\n" +
+			"import \"" + Service + "/domain/entity\"\n\n" +
 			"type Service interface {\n" +
-			service_functions("entity.") +
+			serviceFunctions("entity.", "") +
 			"}\n\n" +
 			"//Please remove the attribute that is not required for create or update params\n\n" +
 			"type Create" + Model + "Params struct {\n" + b.String() + "}\n\n" +
@@ -145,16 +150,33 @@ func service_interface_data() []byte {
 	return []byte(data)
 }
 
-func repos_models_data() []byte {
-	data := "package repos\n\n" +
-		"import " + ServiceAbbreviation + " \"" + Service + "/service\"\n\n" +
-		"type " + Model + "Repo " + "interface {\n" +
-		service_functions(ServiceAbbreviation+".") + "}"
+func repoInterfaceData() []byte {
+	b := new(bytes.Buffer)
+	for key, value := range Attributes {
+		fmt.Fprintf(b, "\t%s %s\n", key, value)
+	}
+
+	data :=
+		"package repository\n\n" +
+			"import \"" + Service + "/domain\"\n\n" +
+			"import \"" + Service + "/domain/entity\"\n\n" +
+			"type " + Model + "Repo interface {\n" +
+			serviceFunctions("entity.", "domain.") +
+			"}\n\n"
 
 	return []byte(data)
 }
 
-func service_implementation() []byte {
+// func repos_models_data() []byte {
+// 	data := "package repos\n\n" +
+// 		"import " + ServiceAbbreviation + " \"" + Service + "/service\"\n\n" +
+// 		"type " + Model + "Repo " + "interface {\n" +
+// 		serviceFunctions(ServiceAbbreviation+".") + "}"
+
+// 	return []byte(data)
+// }
+
+func serviceImplementation() []byte {
 	data :=
 		"package service \n\n" +
 			"import (\n" +
@@ -170,22 +192,22 @@ func service_implementation() []byte {
 			"\t" + LowerCaseModel + "Repo := postgresql.MakePostgres" + Model + "Repo()\n" +
 			"\treturn ServiceImpl{" + LowerCaseModel + "Repo: &" + LowerCaseModel + "Repo}\n" +
 			"}\n\n" +
-			service_implementation_functions()
+			serviceImplementationFunctions()
 
 	return []byte(data)
 }
 
-func service_functions(prefix string) string {
+func serviceFunctions(prefix string, prefix_2 string) string {
 	list := "\tList" + Model + "s() ([]" + prefix + Model + ", error)\n"
 	get := "\tGet" + Model + "(id string) (" + prefix + Model + ", error)\n"
-	create := "\tCreate" + Model + "(" + LowerCaseModel + " " + prefix + Model + ") (" + prefix + Model + ", error)\n"
-	update := "\tUpdate" + Model + "(" + LowerCaseModel + " " + prefix + Model + ") (" + prefix + Model + ", error)\n"
+	create := "\tCreate" + Model + "(params " + prefix_2 + "Create" + Model + "Params) (" + prefix + Model + ", error)\n"
+	update := "\tUpdate" + Model + "(params " + prefix_2 + "Update" + Model + "Params) (" + prefix + Model + ", error)\n"
 	del := "\tDelete" + Model + "(id string) (interface{}, error)\n"
 
 	return list + get + create + update + del
 }
 
-func decoder_data() []byte {
+func decoderData() []byte {
 	b := new(bytes.Buffer)
 	for key, value := range Attributes {
 		fmt.Fprintf(b, "\t%s %s %s\n", key, value, "`json:\""+LowerInitial(key)+"\"`")
@@ -208,12 +230,12 @@ func decoder_data() []byte {
 			"type Update" + Model + "Request struct {\n" +
 			b.String() +
 			"}\n\n" +
-			make_decoder()
+			makeDecoder()
 
 	return []byte(data)
 }
 
-func encoder_data() []byte {
+func encoderData() []byte {
 	data := "package endpoint\n\n" +
 		"import (\n" +
 		"\t\"context\"\n" +
@@ -231,7 +253,7 @@ func encoder_data() []byte {
 	return []byte(data)
 }
 
-func view_data() []byte {
+func viewData() []byte {
 	b := new(bytes.Buffer)
 	v := new(bytes.Buffer)
 	for key, value := range Attributes {
@@ -255,14 +277,14 @@ func view_data() []byte {
 	return []byte(data)
 }
 
-func endpoint_data() []byte {
+func endpointData() []byte {
 	data := "package endpoint\n\n" +
 		"import (\n" +
 		"\t\"" + Service + "/domain\"\n" +
 		"\t\"context\"\n" +
 		"\t\"github.com/go-kit/kit/endpoint\"\n" +
 		")\n\n" +
-		endpoint_implementation_functions()
+		endpointImplementationFunctions()
 
 	return []byte(data)
 }
@@ -280,7 +302,7 @@ func make_service() string {
 	return data
 }
 
-func service_implementation_functions() string {
+func serviceImplementationFunctions() string {
 	data :=
 		"func (s ServiceImpl) List" + Model + "s() ([]entity." + Model + ", error) {\n" +
 			"\treturn s." + LowerCaseModel + "Repo.List" + Model + "s()\n" +
@@ -291,11 +313,11 @@ func service_implementation_functions() string {
 			"}\n\n" +
 
 			"func (s ServiceImpl) Create" + Model + "(params domain.Create" + Model + "Params) (entity." + Model + ", error) {\n" +
-			"\treturn s." + LowerCaseModel + "Repo.Create" + Model + "(" + LowerCaseModel + ")\n" +
+			"\treturn s." + LowerCaseModel + "Repo.Create" + Model + "(params)\n" +
 			"}\n\n" +
 
 			"func (s ServiceImpl) Update" + Model + "(params domain.Update" + Model + "Params) (entity." + Model + ", error) {\n" +
-			"\treturn s." + LowerCaseModel + "Repo.Update" + Model + "(" + LowerCaseModel + ")\n" +
+			"\treturn s." + LowerCaseModel + "Repo.Update" + Model + "(params)\n" +
 			"}\n\n" +
 
 			"func (s ServiceImpl) Delete" + Model + "(id string) error {\n" +
@@ -304,36 +326,36 @@ func service_implementation_functions() string {
 	return data
 }
 
-func endpoint_implementation_functions() string {
+func endpointImplementationFunctions() string {
 	data :=
-		func_string("MakeList"+Model+"sEndpoint") +
-			"\t" + return_string() +
+		funcString("MakeList"+Model+"sEndpoint") +
+			"\t" + returnString() +
 			"\t\t" + "v, err := s.List" + Model + "s()\n" +
-			"\t\t" + error_not_nil_string() +
+			"\t\t" + errorNotNilString() +
 			LowerCaseModel + "s" + " := make([]" + Model + "View, 0)\n" +
 			"for _, " + LowerCaseModel + " := range v {\n" +
 			"\t" + LowerCaseModel + "s" + " = append(" + LowerCaseModel + "s" + ", to" + Model + "View(" + LowerCaseModel + "))\n" +
 			"}\n" +
-			response_string(LowerCaseModel+"s", "nil") +
+			responseString(LowerCaseModel+"s", "nil") +
 			"}\n}\n\n" +
 
-			func_string("MakeGet"+Model+"Endpoint") +
-			"\t" + return_string() +
+			funcString("MakeGet"+Model+"Endpoint") +
+			"\t" + returnString() +
 			"\treq := request.(Get" + Model + "Request)\n" +
 			"\t" + ServiceAbbreviation + ", err := s.Get" + Model + "(req.Id)\n" +
-			"\t\t" + error_not_nil_string() +
-			response_string("to"+Model+"View("+ServiceAbbreviation+")", "nil") +
+			"\t\t" + errorNotNilString() +
+			responseString("to"+Model+"View("+ServiceAbbreviation+")", "nil") +
 			"}\n}\n\n" +
 
 			create_update("Create") +
 			create_update("Update") +
 
-			func_string("MakeDelete"+Model+"Endpoint") +
-			"\t" + return_string() +
+			funcString("MakeDelete"+Model+"Endpoint") +
+			"\t" + returnString() +
 			"\treq := request.(Delete" + Model + "Request)\n" +
 			"\terr := s.Delete" + Model + "(req.Id)\n" +
-			"\t\t" + error_not_nil_string() +
-			response_string("nil", "nil") +
+			"\t\t" + errorNotNilString() +
+			responseString("nil", "nil") +
 			"}\n}\n\n"
 
 	return data
@@ -341,17 +363,17 @@ func endpoint_implementation_functions() string {
 
 func create_update(name string) string {
 	data :=
-		func_string("Make"+name+Model+"Endpoint") +
-			"\t" + return_string() +
+		funcString("Make"+name+Model+"Endpoint") +
+			"\t" + returnString() +
 			"\treq := request.(" + name + Model + "Request)\n" +
-			"\t" + ServiceAbbreviation + ", err := s." + name + Model + "(" + name + Model + "Params(req))\n" +
-			"\t\t" + error_not_nil_string() +
-			response_string("to"+Model+"View("+ServiceAbbreviation+")", "nil") +
+			"\t" + ServiceAbbreviation + ", err := s." + name + Model + "(domain." + name + Model + "Params(req))\n" +
+			"\t\t" + errorNotNilString() +
+			responseString("to"+Model+"View("+ServiceAbbreviation+")", "nil") +
 			"}\n}\n\n"
 	return data
 }
 
-func make_decoder() string {
+func makeDecoder() string {
 	return "func MakeDecoder(request interface{}) func (_ context.Context, r *http.Request) (interface{}, error) {\n" +
 		"\treturn func (_ context.Context, r *http.Request) (interface{}, error) {\n" +
 		"\t\tif err := json.NewDecoder(r.Body).Decode(&request); err != nil {\n" +
@@ -362,6 +384,14 @@ func make_decoder() string {
 		"}"
 }
 
+func repoImplementationData() []byte {
+	return []byte("Yet To BE ImpleMEnted")
+}
+
+func connectionData() []byte {
+	return []byte("Yet To BE ImpleMEnted")
+}
+
 func LowerInitial(str string) string {
 	for i, v := range str {
 		temp := string(unicode.ToLower(v)) + str[i+1:]
@@ -370,21 +400,21 @@ func LowerInitial(str string) string {
 	return ""
 }
 
-func response_string(data string, err string) string {
+func responseString(data string, err string) string {
 	return "return Response{Data: " + data + ", Errors: " + err + "}, " + err + "\n"
 }
 
-func return_string() string {
+func returnString() string {
 	return "return func(_ context.Context, request interface{}) (interface{}, error) {\n"
 }
 
-func error_not_nil_string() string {
+func errorNotNilString() string {
 	data := "if err != nil {\n" +
 		"\treturn Response{Data: nil, Errors: []error{err}}, err\n" +
 		"}\n"
 	return data
 }
 
-func func_string(name string) string {
+func funcString(name string) string {
 	return "func " + name + "(s domain.Service) endpoint.Endpoint {\n"
 }
