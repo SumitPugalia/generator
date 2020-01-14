@@ -45,6 +45,7 @@ func main() {
 	create_file(endpoint_dir, "decoder.go", decoder_data())
 	create_file(endpoint_dir, "encoder.go", encoder_data())
 	create_file(endpoint_dir, "view.go", view_data())
+	create_file(endpoint_dir, "endpoint.go", endpoint_data())
 }
 
 func create_dir(dirName string) error {
@@ -254,6 +255,18 @@ func view_data() []byte {
 	return []byte(data)
 }
 
+func endpoint_data() []byte {
+	data := "package endpoint\n\n" +
+		"import (\n" +
+		"\t\"" + Service + "/domain\"\n" +
+		"\t\"context\"\n" +
+		"\t\"github.com/go-kit/kit/endpoint\"\n" +
+		")\n\n" +
+		endpoint_implementation_functions()
+
+	return []byte(data)
+}
+
 func make_service() string {
 	data := "func MakeService() service.Service {\n" +
 		"\trDB, err := db.GetPostgresDB()\n" +
@@ -291,6 +304,53 @@ func service_implementation_functions() string {
 	return data
 }
 
+func endpoint_implementation_functions() string {
+	data :=
+		func_string("MakeList"+Model+"sEndpoint") +
+			"\t" + return_string() +
+			"\t\t" + "v, err := s.List" + Model + "s()\n" +
+			"\t\t" + error_not_nil_string() +
+			LowerCaseModel + "s" + " := make([]" + Model + "View, 0)\n" +
+			"for _, " + LowerCaseModel + " := range v {\n" +
+			"\t" + LowerCaseModel + "s" + " = append(" + LowerCaseModel + "s" + ", to" + Model + "View(" + LowerCaseModel + "))\n" +
+			"}\n" +
+			response_string(LowerCaseModel+"s", "nil") +
+			"}\n}\n\n" +
+
+			func_string("MakeGet"+Model+"Endpoint") +
+			"\t" + return_string() +
+			"\treq := request.(Get" + Model + "Request)\n" +
+			"\t" + ServiceAbbreviation + ", err := s.Get" + Model + "(req.Id)\n" +
+			"\t\t" + error_not_nil_string() +
+			response_string("to"+Model+"View("+ServiceAbbreviation+")", "nil") +
+			"}\n}\n\n" +
+
+			create_update("Create") +
+			create_update("Update") +
+
+			func_string("MakeDelete"+Model+"Endpoint") +
+			"\t" + return_string() +
+			"\treq := request.(Delete" + Model + "Request)\n" +
+			"\terr := s.Delete" + Model + "(req.Id)\n" +
+			"\t\t" + error_not_nil_string() +
+			response_string("nil", "nil") +
+			"}\n}\n\n"
+
+	return data
+}
+
+func create_update(name string) string {
+	data :=
+		func_string("Make"+name+Model+"Endpoint") +
+			"\t" + return_string() +
+			"\treq := request.(" + name + Model + "Request)\n" +
+			"\t" + ServiceAbbreviation + ", err := s." + name + Model + "(" + name + Model + "Params(req))\n" +
+			"\t\t" + error_not_nil_string() +
+			response_string("to"+Model+"View("+ServiceAbbreviation+")", "nil") +
+			"}\n}\n\n"
+	return data
+}
+
 func make_decoder() string {
 	return "func MakeDecoder(request interface{}) func (_ context.Context, r *http.Request) (interface{}, error) {\n" +
 		"\treturn func (_ context.Context, r *http.Request) (interface{}, error) {\n" +
@@ -308,4 +368,23 @@ func LowerInitial(str string) string {
 		return strings.Trim(temp, " ")
 	}
 	return ""
+}
+
+func response_string(data string, err string) string {
+	return "return Response{Data: " + data + ", Errors: " + err + "}, " + err + "\n"
+}
+
+func return_string() string {
+	return "return func(_ context.Context, request interface{}) (interface{}, error) {\n"
+}
+
+func error_not_nil_string() string {
+	data := "if err != nil {\n" +
+		"\treturn Response{Data: nil, Errors: []error{err}}, err\n" +
+		"}\n"
+	return data
+}
+
+func func_string(name string) string {
+	return "func " + name + "(s domain.Service) endpoint.Endpoint {\n"
 }
