@@ -43,6 +43,7 @@ func main() {
 	endpoint_dir := Service + "/" + "endpoint"
 	create_dir(endpoint_dir)
 	create_file(endpoint_dir, "decoder.go", decoder_data())
+	create_file(endpoint_dir, "encoder.go", encoder_data())
 }
 
 func create_dir(dirName string) error {
@@ -206,6 +207,24 @@ func decoder_data() []byte {
 			b.String() +
 			"}\n\n" +
 			make_decoder()
+
+	return []byte(data)
+}
+
+func encoder_data() []byte {
+	data := "package endpoint\n\n" +
+		"import (\n" +
+		"\t\"context\"\n" +
+		"\t\"encoding/json\"\n" +
+		"\t\"net/http\"\n" +
+		")\n\n" +
+		"type Response struct {\n" +
+		"\tData interface{} `json:\"data\"`\n" +
+		"\tErrors []error `json:\"errors\"`\n" +
+		"}\n\n" +
+		"func EncodeResponse(_ context.Context, w http.ResponseWriter, response interface{}) error {\n" +
+		"\treturn json.NewEncoder(w).Encode(response)\n" +
+		"}"
 
 	return []byte(data)
 }
